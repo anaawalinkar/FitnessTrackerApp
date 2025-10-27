@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '/models/workout_entry.dart';
+import '../services/database_service.dart';
 import 'progress_summary_screen.dart';
 
 class WorkoutLogScreen extends StatefulWidget {

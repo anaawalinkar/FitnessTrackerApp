@@ -14,7 +14,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: HomeScreen(), // This should point to your HomeScreen
+      home: HomeScreen(),
       debugShowCheckedModeBanner: false,
     );
   }

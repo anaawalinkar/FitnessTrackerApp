@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../models/meal_entry.dart';
+import '../services/database_service.dart';
 
 class CalorieTrackerScreen extends StatefulWidget {
   @override
