@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/meal_entry.dart';
 import '../services/database_service.dart';
 
 class CalorieTrackerScreen extends StatefulWidget {
@@ -9,15 +8,42 @@ class CalorieTrackerScreen extends StatefulWidget {
 
 class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
   final _formKey = GlobalKey<FormState>();
-  List<MealEntry> meals = [];
-  double dailyCalorieGoal = 2000.0;
+  final DatabaseService _databaseService = DatabaseService();
+  List<Map<String, dynamic>> meals = [];
+  Map<String, dynamic> settings = {};
   
   TextEditingController foodController = TextEditingController();
   TextEditingController caloriesController = TextEditingController();
   TextEditingController mealTypeController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await _loadMeals();
+    await _loadSettings();
+  }
+
+  Future<void> _loadMeals() async {
+    final mealsList = await _databaseService.getMeals();
+    setState(() {
+      meals = mealsList;
+    });
+  }
+
+  Future<void> _loadSettings() async {
+    final settingsData = await _databaseService.getSettings();
+    setState(() {
+      settings = settingsData;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    double dailyCalorieGoal = (settings['daily_calorie_goal'] ?? 2000).toDouble();
     double totalCalories = _calculateTotalCalories();
     double remainingCalories = dailyCalorieGoal - totalCalories;
     
@@ -29,7 +55,6 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Calorie Summary
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -67,7 +92,6 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
             
             SizedBox(height: 20),
             
-            // Input Form
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -141,7 +165,6 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
             
             SizedBox(height: 20),
             
-            // Meal List
             Expanded(
               child: meals.isEmpty
                   ? Center(
@@ -153,15 +176,16 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
                   : ListView.builder(
                       itemCount: meals.length,
                       itemBuilder: (context, index) {
+                        final meal = meals[index];
                         return Card(
                           margin: EdgeInsets.symmetric(vertical: 4),
                           child: ListTile(
                             leading: Icon(Icons.restaurant, color: Colors.orange),
-                            title: Text(meals[index].foodItem),
-                            subtitle: Text('${meals[index].mealType} - ${meals[index].calories} cal'),
+                            title: Text(meal['food_item']),
+                            subtitle: Text('${meal['meal_type']} - ${meal['calories']} cal'),
                             trailing: IconButton(
                               icon: Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _removeMeal(index),
+                              onPressed: () => _removeMeal(meal['id']),
                             ),
                           ),
                         );
@@ -194,46 +218,62 @@ class _CalorieTrackerScreenState extends State<CalorieTrackerScreen> {
     );
   }
 
-  void _addMeal() {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        meals.add(MealEntry(
-          foodItem: foodController.text,
-          calories: caloriesController.text,
-          mealType: mealTypeController.text.isEmpty ? 'Meal' : mealTypeController.text,
-        ));
-        
-        // Clear form
-        foodController.clear();
-        caloriesController.clear();
-        mealTypeController.clear();
-      });
-    }
+Future<void> _addMeal() async {
+  if (foodController.text.trim().isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Please enter a food item')),
+    );
+    return;
   }
 
-  void _removeMeal(int index) {
-    setState(() {
-      meals.removeAt(index);
-    });
+  if (caloriesController.text.trim().isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Please enter calories')),
+    );
+    return;
+  }
+
+  try {
+    print('🔄 Adding meal...');
+    
+    await _databaseService.insertMeal(
+      foodController.text.trim(),
+      caloriesController.text.trim(),
+      mealTypeController.text.trim(),
+    );
+    
+    await _loadMeals();
+    
+    foodController.clear();
+    caloriesController.clear();
+    mealTypeController.clear();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('✅ Meal added successfully!')),
+    );
+    
+  } catch (e) {
+    print('❌ Error adding meal: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error adding meal. Please try again.')),
+    );
+  }
+}
+
+  Future<void> _removeMeal(int id) async {
+    await _databaseService.deleteMeal(id);
+    await _loadMeals(); // Reload from database
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Meal deleted!')),
+    );
   }
 
   double _calculateTotalCalories() {
     double total = 0;
     for (var meal in meals) {
-      total += double.tryParse(meal.calories) ?? 0;
+      total += double.tryParse(meal['calories'] ?? '0') ?? 0;
     }
     return total;
   }
-}
-
-class MealEntry {
-  final String foodItem;
-  final String calories;
-  final String mealType;
-
-  MealEntry({
-    required this.foodItem,
-    required this.calories,
-    required this.mealType,
-  });
 }

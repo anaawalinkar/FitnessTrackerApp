@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/database_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   @override
@@ -6,11 +7,34 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final DatabaseService _databaseService = DatabaseService();
+  
   bool workoutReminders = true;
   bool calorieReminders = false;
   TimeOfDay selectedTime = TimeOfDay(hour: 8, minute: 0);
   double dailyCalorieGoal = 2000.0;
   int dailyWorkoutGoal = 30;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final settings = await _databaseService.getSettings();
+    setState(() {
+      dailyCalorieGoal = (settings['daily_calorie_goal'] ?? 2000).toDouble();
+      dailyWorkoutGoal = settings['daily_workout_goal'] ?? 30;
+      workoutReminders = settings['workout_reminders'] == 1;
+      calorieReminders = settings['calorie_reminders'] == 1;
+      
+      //parse reminder time
+      final timeString = settings['reminder_time'] ?? '08:00';
+      final parts = timeString.split(':');
+      selectedTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+    });
+  }
 
   Future<void> _selectTime(BuildContext context) async {
     final TimeOfDay? picked = await showTimePicker(
@@ -24,6 +48,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _saveSettings() async {
+    final settings = {
+      'daily_calorie_goal': dailyCalorieGoal,
+      'daily_workout_goal': dailyWorkoutGoal,
+      'workout_reminders': workoutReminders ? 1 : 0,
+      'calorie_reminders': calorieReminders ? 1 : 0,
+      'reminder_time': '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}',
+    };
+
+    await _databaseService.updateSettings(settings);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Settings saved successfully!')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -34,7 +74,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            // Goals Section
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -47,7 +86,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     SizedBox(height: 16),
                     
-                    // Calorie Goal
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -69,7 +107,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     
                     SizedBox(height: 16),
                     
-                    // Workout Goal
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -95,7 +132,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             
             SizedBox(height: 20),
             
-            // Notifications Section
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -108,7 +144,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     SizedBox(height: 16),
                     
-                    // Workout Reminders
                     SwitchListTile(
                       title: Text('Workout Reminders'),
                       subtitle: Text('Daily reminders for workouts'),
@@ -120,7 +155,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                     
-                    // Calorie Reminders
                     SwitchListTile(
                       title: Text('Calorie Logging Reminders'),
                       subtitle: Text('Reminders to log your meals'),
@@ -132,7 +166,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                     
-                    // Reminder Time
                     ListTile(
                       leading: Icon(Icons.access_time),
                       title: Text('Reminder Time'),
@@ -145,65 +178,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             
-            SizedBox(height: 20),
-            
-            // App Settings
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'App Settings',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    SizedBox(height: 16),
-                    
-                    ListTile(
-                      leading: Icon(Icons.palette),
-                      title: Text('Theme'),
-                      subtitle: Text('Change app appearance'),
-                      trailing: Icon(Icons.arrow_forward_ios),
-                      onTap: () {
-                        // Theme settings would go here
-                      },
-                    ),
-                    
-                    ListTile(
-                      leading: Icon(Icons.security),
-                      title: Text('Privacy'),
-                      subtitle: Text('Manage your data privacy'),
-                      trailing: Icon(Icons.arrow_forward_ios),
-                      onTap: () {
-                        // Privacy settings would go here
-                      },
-                    ),
-                    
-                    ListTile(
-                      leading: Icon(Icons.help),
-                      title: Text('Help & Support'),
-                      subtitle: Text('Get help using the app'),
-                      trailing: Icon(Icons.arrow_forward_ios),
-                      onTap: () {
-                        // Help section would go here
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            
             SizedBox(height: 30),
             
-            // Save Button
             ElevatedButton(
-              onPressed: () {
-                // Save settings logic would go here
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Settings saved successfully!')),
-                );
-              },
+              onPressed: _saveSettings,
               child: Text('Save Settings'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,

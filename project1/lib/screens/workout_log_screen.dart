@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '/models/workout_entry.dart';
 import '../services/database_service.dart';
 import 'progress_summary_screen.dart';
 
@@ -10,12 +9,26 @@ class WorkoutLogScreen extends StatefulWidget {
 
 class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
   final _formKey = GlobalKey<FormState>();
-  List<WorkoutEntry> workouts = [];
+  final DatabaseService _databaseService = DatabaseService();
+  List<Map<String, dynamic>> workouts = [];
   
   TextEditingController exerciseController = TextEditingController();
   TextEditingController setsController = TextEditingController();
   TextEditingController repsController = TextEditingController();
   TextEditingController durationController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWorkouts();
+  }
+
+  Future<void> _loadWorkouts() async {
+    final workoutsList = await _databaseService.getWorkouts();
+    setState(() {
+      workouts = workoutsList;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +51,6 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Input Form
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -116,7 +128,6 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
             
             SizedBox(height: 20),
             
-            // Current Session Summary
             if (workouts.isNotEmpty) ...[
               Card(
                 child: Padding(
@@ -125,7 +136,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Current Session Summary',
+                        'Workout Summary',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       SizedBox(height: 8),
@@ -139,7 +150,6 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
             
             SizedBox(height: 20),
             
-            // Workout List
             Expanded(
               child: workouts.isEmpty
                   ? Center(
@@ -151,15 +161,16 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
                   : ListView.builder(
                       itemCount: workouts.length,
                       itemBuilder: (context, index) {
+                        final workout = workouts[index];
                         return Card(
                           margin: EdgeInsets.symmetric(vertical: 4),
                           child: ListTile(
                             leading: Icon(Icons.fitness_center, color: Colors.green),
-                            title: Text(workouts[index].exercise),
-                            subtitle: Text('Sets: ${workouts[index].sets} | Reps: ${workouts[index].reps} | ${workouts[index].duration} min'),
+                            title: Text(workout['exercise']),
+                            subtitle: Text('Sets: ${workout['sets']} | Reps: ${workout['reps']} | ${workout['duration']} min'),
                             trailing: IconButton(
                               icon: Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _removeWorkout(index),
+                              onPressed: () => _removeWorkout(workout['id']),
                             ),
                           ),
                         );
@@ -172,50 +183,60 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     );
   }
 
-  void _addWorkout() {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        workouts.add(WorkoutEntry(
-          exercise: exerciseController.text,
-          sets: setsController.text,
-          reps: repsController.text,
-          duration: durationController.text,
-        ));
-        
-        // Clear form
-        exerciseController.clear();
-        setsController.clear();
-        repsController.clear();
-        durationController.clear();
-      });
-    }
+Future<void> _addWorkout() async {
+  // Basic validation
+  if (exerciseController.text.trim().isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Please enter an exercise name')),
+    );
+    return;
   }
 
-  void _removeWorkout(int index) {
-    setState(() {
-      workouts.removeAt(index);
-    });
+  try {
+    print('Adding workout...');
+    
+    await _databaseService.insertWorkout(
+      exerciseController.text.trim(),
+      setsController.text.trim(),
+      repsController.text.trim(),
+      durationController.text.trim(),
+    );
+    
+    // Reload the workouts
+    await _loadWorkouts();
+    
+    // Clear the form
+    exerciseController.clear();
+    setsController.clear();
+    repsController.clear();
+    durationController.clear();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Workout added successfully!')),
+    );
+    
+  } catch (e) {
+    print('Error adding workout: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error adding workout. Please try again.')),
+    );
+  }
+}
+
+  Future<void> _removeWorkout(int id) async {
+    await _databaseService.deleteWorkout(id);
+    await _loadWorkouts(); // Reload from database
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Workout deleted!')),
+    );
   }
 
   String _calculateTotalDuration() {
     int total = 0;
     for (var workout in workouts) {
-      total += int.tryParse(workout.duration) ?? 0;
+      total += int.tryParse(workout['duration'] ?? '0') ?? 0;
     }
     return total.toString();
   }
-}
-
-class WorkoutEntry {
-  final String exercise;
-  final String sets;
-  final String reps;
-  final String duration;
-
-  WorkoutEntry({
-    required this.exercise,
-    required this.sets,
-    required this.reps,
-    required this.duration,
-  });
 }
