@@ -27,11 +27,11 @@ class DatabaseService {
       };
       
       workouts.add(workout);
-      print('✅ Workout added successfully! Total workouts: ${workouts.length}');
+      print('Workout added successfully! Total workouts: ${workouts.length}');
       return 1;
     } catch (e) {
-      print('❌ ERROR in insertWorkout: $e');
-      print('❌ Stack trace: ${e.toString()}');
+      print('ERROR in insertWorkout: $e');
+      print('Stack trace: ${e.toString()}');
       rethrow;
     }
   }
@@ -64,10 +64,10 @@ class DatabaseService {
       };
       
       meals.add(meal);
-      print('✅ Meal added successfully! Total meals: ${meals.length}');
+      print('Meal added successfully! Total meals: ${meals.length}');
       return 1;
     } catch (e) {
-      print('❌ ERROR in insertMeal: $e');
+      print('ERROR in insertMeal: $e');
       rethrow;
     }
   }
